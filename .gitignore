@@ -1,0 +1,18 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node / Dependencies (if any added in future)
+node_modules/
+package-lock.json
+
+# IDE / Editor Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Exported captures
+*.png
+!screenshot.png

@@ -1,0 +1,1498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SQUID PROTOCOL // 456 — Generative Digital Artwork</title>
+  <style>
+    /* =========================================================================
+       RESET & FULL-VIEWPORT GALLERY LAYOUT
+       ========================================================================= */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-base: #07070b;
+      --accent-primary: #00f0c8;
+      --accent-secondary: #ff1e6e;
+      --hud-bg: rgba(10, 11, 18, 0.62);
+      --hud-border: rgba(255, 255, 255, 0.12);
+      --text-main: rgba(244, 246, 250, 0.92);
+      --text-muted: rgba(244, 246, 250, 0.52);
+      --font-mono: 'SFMono-Regular', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      background-color: var(--bg-base);
+      color: var(--text-main);
+      font-family: var(--font-sans);
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+      touch-action: none;
+    }
+
+    #artCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+
+    /* =========================================================================
+       MINIMALIST GALLERY HUD
+       ========================================================================= */
+    .hud-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      transition: opacity 0.45s cubic-bezier(0.22, 1, 0.36, 1), visibility 0.45s ease;
+    }
+
+    .hud-layer.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    /* Top-Left Title Badge */
+    .hud-header {
+      position: absolute;
+      top: 22px;
+      left: 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: auto;
+    }
+
+    .hud-title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .hud-title {
+      font-family: var(--font-mono);
+      font-size: clamp(0.78rem, 1.3vw, 0.95rem);
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      color: var(--text-main);
+      text-shadow: 0 0 18px rgba(0, 240, 200, 0.28);
+    }
+
+    .hud-glyphs {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      opacity: 0.85;
+    }
+
+    .hud-glyphs svg {
+      width: 11px;
+      height: 11px;
+      stroke: var(--accent-secondary);
+      stroke-width: 2;
+      fill: none;
+      transition: stroke 0.35s ease;
+    }
+
+    .hud-subtitle {
+      font-family: var(--font-mono);
+      font-size: 0.68rem;
+      letter-spacing: 0.16em;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background-color: var(--accent-primary);
+      box-shadow: 0 0 10px var(--accent-primary);
+      transition: background-color 0.35s ease, box-shadow 0.35s ease;
+      animation: pulseDot 2.2s ease-in-out infinite;
+    }
+
+    @keyframes pulseDot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(0.8); }
+    }
+
+    /* Bottom-Center Control Pill Bar */
+    .hud-controls-wrap {
+      position: absolute;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      max-width: calc(100vw - 24px);
+      pointer-events: auto;
+    }
+
+    .hud-pill {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: var(--hud-bg);
+      border: 1px solid var(--hud-border);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    }
+
+    .hud-divider {
+      width: 1px;
+      height: 18px;
+      background: rgba(255, 255, 255, 0.14);
+      margin: 0 4px;
+    }
+
+    .hud-btn {
+      appearance: none;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      padding: 7px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.22s ease;
+      white-space: nowrap;
+    }
+
+    .hud-btn:hover {
+      color: var(--text-main);
+      background: rgba(255, 255, 255, 0.07);
+    }
+
+    .hud-btn:active {
+      transform: scale(0.96);
+    }
+
+    .hud-btn .key-hint {
+      font-size: 0.62rem;
+      opacity: 0.5;
+      padding: 1px 4px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+
+    /* Active Mode States */
+    .hud-btn.is-active[data-mode="green"] {
+      color: #00f0c8;
+      background: rgba(0, 240, 200, 0.12);
+      border-color: rgba(0, 240, 200, 0.45);
+      box-shadow: 0 0 16px rgba(0, 240, 200, 0.18);
+    }
+
+    .hud-btn.is-active[data-mode="red"] {
+      color: #ff2a55;
+      background: rgba(255, 0, 60, 0.15);
+      border-color: rgba(255, 0, 60, 0.55);
+      box-shadow: 0 0 18px rgba(255, 0, 60, 0.25);
+    }
+
+    .hud-btn.is-active[data-mode="gold"] {
+      color: #ffd166;
+      background: rgba(255, 209, 102, 0.14);
+      border-color: rgba(255, 209, 102, 0.5);
+      box-shadow: 0 0 18px rgba(255, 209, 102, 0.2);
+    }
+
+    .hud-btn-action:hover {
+      border-color: rgba(255, 255, 255, 0.22);
+    }
+
+    /* Subtle Restore HUD Hint (only visible when HUD is hidden) */
+    .hud-restore-hint {
+      position: fixed;
+      bottom: 14px;
+      right: 18px;
+      z-index: 12;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.14em;
+      color: rgba(255, 255, 255, 0.25);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      padding: 6px 10px;
+      border-radius: 999px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.35s ease, color 0.2s ease;
+    }
+
+    .hud-restore-hint.is-visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .hud-restore-hint:hover {
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    /* Toast Notification for PNG Export */
+    .toast {
+      position: fixed;
+      top: 22px;
+      right: 26px;
+      z-index: 20;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      letter-spacing: 0.1em;
+      padding: 9px 15px;
+      border-radius: 999px;
+      background: rgba(12, 14, 22, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      color: var(--text-main);
+      backdrop-filter: blur(10px);
+      opacity: 0;
+      transform: translateY(-8px);
+      pointer-events: none;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .toast.is-shown {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    @media (max-width: 680px) {
+      .hud-header {
+        top: 14px;
+        left: 16px;
+      }
+      .hud-controls-wrap {
+        bottom: 14px;
+      }
+      .hud-pill {
+        border-radius: 18px;
+        padding: 6px 8px;
+        gap: 4px;
+      }
+      .hud-btn {
+        font-size: 0.66rem;
+        padding: 6px 9px;
+      }
+      .hud-divider {
+        display: none;
+      }
+      .hud-btn .key-hint {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Full-Viewport Interactive Canvas -->
+  <canvas id="artCanvas" aria-label="SQUID PROTOCOL 456 Generative Artwork"></canvas>
+
+  <!-- Minimalist Gallery HUD -->
+  <div id="hudLayer" class="hud-layer">
+    <header class="hud-header">
+      <div class="hud-title-row">
+        <span class="hud-title">SQUID PROTOCOL // 456</span>
+        <span class="hud-glyphs" aria-hidden="true">
+          <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" /></svg>
+          <svg viewBox="0 0 16 16"><polygon points="8,2 14.5,13.5 1.5,13.5" /></svg>
+          <svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="11" height="11" /></svg>
+        </span>
+      </div>
+      <div class="hud-subtitle">
+        <span id="statusDot" class="status-dot"></span>
+        <span id="modeReadout">MODE 01 // GREEN LIGHT</span>
+      </div>
+    </header>
+
+    <nav class="hud-controls-wrap" aria-label="Artwork Controls">
+      <div class="hud-pill">
+        <button class="hud-btn is-active" data-mode="green" title="Switch to Green Light (Key 1)">
+          <span class="key-hint">1</span> Green Light
+        </button>
+        <button class="hud-btn" data-mode="red" title="Switch to Red Light (Key 2)">
+          <span class="key-hint">2</span> Red Light
+        </button>
+        <button class="hud-btn" data-mode="gold" title="Switch to Golden Piggy (Key 3)">
+          <span class="key-hint">3</span> Golden Piggy
+        </button>
+
+        <span class="hud-divider" aria-hidden="true"></span>
+
+        <button id="btnGlitch" class="hud-btn hud-btn-action" title="Trigger Chromatic Glitch (Space)">
+          Glitch
+        </button>
+        <button id="btnSave" class="hud-btn hud-btn-action" title="Export High-Res PNG">
+          Save PNG
+        </button>
+        <button id="btnHideHud" class="hud-btn hud-btn-action" title="Hide Interface (Key H)">
+          Hide HUD <span class="key-hint">H</span>
+        </button>
+      </div>
+    </nav>
+  </div>
+
+  <!-- Discreet restore control when HUD is hidden -->
+  <button id="btnRestoreHud" class="hud-restore-hint" title="Show HUD (Key H)">SHOW HUD [H]</button>
+
+  <!-- Export Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite">SAVED // squid-protocol-456.png</div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      /* =======================================================================
+         1. CONFIGURATION & MODE PALETTES
+         ======================================================================= */
+      const PALETTES = {
+        green: {
+          id: 'green',
+          label: 'MODE 01 // GREEN LIGHT',
+          bgCenter: '#0d101b',
+          bgEdge: '#050508',
+          primary: [0, 240, 200],     // Electric Teal (#00f0c8)
+          secondary: [255, 30, 110],  // Hot Pink (#ff1e6e)
+          accent: [255, 255, 255],
+          maskBase: [18, 20, 28],     // Matte Obsidian
+          maskSpec: [215, 255, 248],
+          wireframe: 'rgba(0, 240, 200, 0.22)',
+          gridColor: 'rgba(0, 240, 200, 0.08)',
+          filigreeColor: [255, 30, 110],
+          orbitSpeed: 0.16,
+          particleDir: -1,            // Drift upward
+          isBokeh: false,
+          cssPrimary: '#00f0c8',
+          cssSecondary: '#ff1e6e'
+        },
+        red: {
+          id: 'red',
+          label: 'MODE 02 // RED LIGHT — SURVEILLANCE',
+          bgCenter: '#19050a',
+          bgEdge: '#060204',
+          primary: [255, 0, 60],      // Crimson (#ff003c)
+          secondary: [245, 248, 255], // Stark White
+          accent: [255, 90, 120],
+          maskBase: [16, 12, 16],
+          maskSpec: [255, 230, 236],
+          wireframe: 'rgba(255, 0, 60, 0.34)',
+          gridColor: 'rgba(255, 0, 60, 0.11)',
+          filigreeColor: [255, 0, 60],
+          orbitSpeed: 0.34,
+          particleDir: -1.4,
+          isBokeh: false,
+          cssPrimary: '#ff003c',
+          cssSecondary: '#ffffff'
+        },
+        gold: {
+          id: 'gold',
+          label: 'MODE 03 // GOLDEN PIGGY',
+          bgCenter: '#181024',        // Deep Violet-Black
+          bgEdge: '#06040b',
+          primary: [255, 209, 102],   // Burnished Gold (#ffd166)
+          secondary: [212, 175, 55],  // Antique Gold (#d4af37)
+          accent: [255, 244, 210],
+          maskBase: [24, 18, 26],
+          maskSpec: [255, 235, 175],
+          wireframe: 'rgba(255, 209, 102, 0.26)',
+          gridColor: 'rgba(212, 175, 55, 0.09)',
+          filigreeColor: [255, 209, 102],
+          orbitSpeed: 0.11,
+          particleDir: 1,             // Rain gently downward
+          isBokeh: true,
+          cssPrimary: '#ffd166',
+          cssSecondary: '#d4af37'
+        }
+      };
+
+      const GLYPH_TYPES = ['circle', 'triangle', 'square'];
+
+      /* =======================================================================
+         2. 3D VECTOR MATH HELPERS
+         ======================================================================= */
+      const Vec3 = {
+        sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+        cross: (a, b) => [
+          a[1] * b[2] - a[2] * b[1],
+          a[2] * b[0] - a[0] * b[2],
+          a[0] * b[1] - a[1] * b[0]
+        ],
+        dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+        normalize: (v) => {
+          const len = Math.hypot(v[0], v[1], v[2]) || 1;
+          return [v[0] / len, v[1] / len, v[2] / len];
+        },
+        rotateXY: (v, rx, ry) => {
+          // Rotate around Y axis
+          const cosY = Math.cos(ry), sinY = Math.sin(ry);
+          const x1 = v[0] * cosY + v[2] * sinY;
+          const z1 = -v[0] * sinY + v[2] * cosY;
+          // Rotate around X axis
+          const cosX = Math.cos(rx), sinX = Math.sin(rx);
+          const y2 = v[1] * cosX - z1 * sinX;
+          const z2 = v[1] * sinX + z1 * cosX;
+          return [x1, y2, z2];
+        }
+      };
+
+      function rgba(rgb, a) {
+        return `rgba(${rgb[0] | 0}, ${rgb[1] | 0}, ${rgb[2] | 0}, ${a})`;
+      }
+
+      function clamp(val, min, max) {
+        return Math.max(min, Math.min(max, val));
+      }
+
+      function lerp(a, b, t) {
+        return a + (b - a) * t;
+      }
+
+      /* =======================================================================
+         3. FACETED FRONT MAN MASK GEOMETRY (SYMMETRICAL LOW-POLY MESH)
+         Coordinates are normalized roughly within X:[-1,1], Y:[-1.3,1.3], Z:[-0.5,0.65]
+         ======================================================================= */
+      function buildFrontManMaskMesh() {
+        // Centerline vertices (x = 0)
+        const V = {
+          topCrown:    [0.00, -1.24,  0.04],
+          foreheadMid: [0.00, -0.84,  0.34],
+          glabella:    [0.00, -0.44,  0.46],
+          noseBridge:  [0.00, -0.14,  0.54],
+          noseTip:     [0.00,  0.18,  0.64],
+          philtrum:    [0.00,  0.42,  0.46],
+          mouthCenter: [0.00,  0.64,  0.42],
+          chinTop:     [0.00,  0.90,  0.38],
+          chinBottom:  [0.00,  1.24,  0.12],
+
+          // Right-half vertices (x > 0), will be mirrored automatically for left side
+          topCorner:   [0.52, -1.10, -0.04],
+          templeHigh:  [0.86, -0.72, -0.22],
+          browMid:     [0.42, -0.62,  0.38],
+          browOuter:   [0.74, -0.46,  0.16],
+
+          // Eye socket aperture (angular menacing slit)
+          eyeInner:    [0.16, -0.34,  0.38],
+          eyeTop:      [0.46, -0.44,  0.32],
+          eyeOuter:    [0.68, -0.30,  0.16],
+          eyeBottom:   [0.40, -0.20,  0.36],
+          eyeDeep:     [0.42, -0.32,  0.08], // Recessed obsidian eye void
+
+          // Cheekbone & Midface facets
+          cheekHigh:   [0.92, -0.12, -0.18],
+          cheekRidge:  [0.64,  0.06,  0.28],
+          noseWing:    [0.24,  0.16,  0.42],
+          cheekLow:    [0.80,  0.44, -0.14],
+
+          // Lower mask / Jawline armor plates
+          mouthCorner: [0.34,  0.56,  0.34],
+          jawMid:      [0.54,  0.84,  0.04],
+          chinSide:    [0.24,  1.12,  0.16]
+        };
+
+        const rawTriangles = [];
+
+        // Helper to push a triangle on the right side and its exact mirror on the left side
+        function addSymTriangle(aKey, bKey, cKey, type = 'armor') {
+          const a = V[aKey], b = V[bKey], c = V[cKey];
+          rawTriangles.push({ verts: [a, b, c], type });
+
+          // Mirror across X = 0 (reverse winding order to keep outward normals consistent)
+          const ma = [-a[0], a[1], a[2]];
+          const mb = [-b[0], b[1], b[2]];
+          const mc = [-c[0], c[1], c[2]];
+          rawTriangles.push({ verts: [ma, mc, mb], type });
+        }
+
+        // --- Forehead & Crown Planes ---
+        addSymTriangle('topCrown', 'topCorner', 'foreheadMid');
+        addSymTriangle('foreheadMid', 'topCorner', 'browMid');
+        addSymTriangle('topCorner', 'templeHigh', 'browOuter');
+        addSymTriangle('topCorner', 'browOuter', 'browMid');
+        addSymTriangle('foreheadMid', 'browMid', 'glabella');
+        addSymTriangle('browMid', 'eyeTop', 'glabella');
+        addSymTriangle('browMid', 'browOuter', 'eyeTop');
+        addSymTriangle('browOuter', 'eyeOuter', 'eyeTop');
+        addSymTriangle('browOuter', 'templeHigh', 'cheekHigh');
+        addSymTriangle('browOuter', 'cheekHigh', 'eyeOuter');
+
+        // --- Recessed Eye Slit (Dark Void Facets) ---
+        addSymTriangle('glabella', 'eyeTop', 'eyeInner');
+        addSymTriangle('eyeInner', 'eyeTop', 'eyeDeep', 'eye');
+        addSymTriangle('eyeTop', 'eyeOuter', 'eyeDeep', 'eye');
+        addSymTriangle('eyeOuter', 'eyeBottom', 'eyeDeep', 'eye');
+        addSymTriangle('eyeBottom', 'eyeInner', 'eyeDeep', 'eye');
+
+        // --- Central Nose Ridge & Cheek Facets ---
+        addSymTriangle('glabella', 'eyeInner', 'noseBridge');
+        addSymTriangle('noseBridge', 'eyeInner', 'eyeBottom');
+        addSymTriangle('noseBridge', 'eyeBottom', 'noseWing');
+        addSymTriangle('noseBridge', 'noseWing', 'noseTip');
+        addSymTriangle('eyeBottom', 'eyeOuter', 'cheekRidge');
+        addSymTriangle('eyeOuter', 'cheekHigh', 'cheekRidge');
+        addSymTriangle('eyeBottom', 'cheekRidge', 'noseWing');
+
+        // --- Lower Cheek & Jawline Architecture ---
+        addSymTriangle('noseTip', 'noseWing', 'philtrum');
+        addSymTriangle('noseWing', 'cheekRidge', 'mouthCorner');
+        addSymTriangle('noseWing', 'mouthCorner', 'philtrum');
+        addSymTriangle('cheekRidge', 'cheekHigh', 'cheekLow');
+        addSymTriangle('cheekRidge', 'cheekLow', 'mouthCorner');
+
+        // --- Mouth Guard & Chin Facets ---
+        addSymTriangle('philtrum', 'mouthCorner', 'mouthCenter');
+        addSymTriangle('mouthCenter', 'mouthCorner', 'chinTop');
+        addSymTriangle('mouthCorner', 'cheekLow', 'jawMid');
+        addSymTriangle('mouthCorner', 'jawMid', 'chinTop');
+        addSymTriangle('chinTop', 'jawMid', 'chinSide');
+        addSymTriangle('chinTop', 'chinSide', 'chinBottom');
+
+        // Enforce outward-facing normals using centroid dot check
+        return rawTriangles.map((tri) => {
+          const [v0, v1, v2] = tri.verts;
+          const e1 = Vec3.sub(v1, v0);
+          const e2 = Vec3.sub(v2, v0);
+          const n = Vec3.normalize(Vec3.cross(e1, e2));
+          // Ensure normal faces generally forward (+Z) or outward
+          if (n[2] < -0.15) {
+            return { verts: [v0, v2, v1], type: tri.type };
+          }
+          return tri;
+        });
+      }
+
+      /* =======================================================================
+         4. PARTICLE, BOKEH & SHOCKWAVE SYSTEMS
+         ======================================================================= */
+      class AmbientParticle {
+        constructor(w, h, randomY = true) {
+          this.reset(w, h, randomY);
+        }
+
+        reset(w, h, randomY = false) {
+          this.x = Math.random() * w;
+          this.y = randomY ? Math.random() * h : (Math.random() > 0.5 ? h + 20 : -20);
+          this.vx = (Math.random() - 0.5) * 0.35;
+          this.vy = 0.25 + Math.random() * 0.75;
+          this.size = 2.2 + Math.random() * 4.5;
+          this.glyph = Math.random() < 0.42 ? GLYPH_TYPES[(Math.random() * 3) | 0] : 'ember';
+          this.alpha = 0.15 + Math.random() * 0.55;
+          this.rot = Math.random() * Math.PI * 2;
+          this.rotSpeed = (Math.random() - 0.5) * 0.025;
+          this.phase = Math.random() * Math.PI * 2;
+          this.useSecondary = Math.random() < 0.38;
+        }
+
+        update(w, h, dt, mouse, palette) {
+          const dir = palette.particleDir;
+          this.phase += dt * 1.8;
+
+          // Gentle horizontal drift + vertical travel
+          this.x += (this.vx + Math.sin(this.phase) * 0.22) * dt * 60;
+          this.y += this.vy * dir * dt * 60;
+          this.rot += this.rotSpeed * dt * 60;
+
+          // Cursor swirl / gentle repulsion
+          const dx = this.x - mouse.x;
+          const dy = this.y - mouse.y;
+          const distSq = dx * dx + dy * dy;
+          const radius = 155;
+          if (distSq < radius * radius && distSq > 1) {
+            const dist = Math.sqrt(distSq);
+            const force = (1 - dist / radius) * 1.4;
+            // Repel + subtle tangential swirl
+            this.x += ((dx / dist) * 0.85 - (dy / dist) * 0.45) * force;
+            this.y += ((dy / dist) * 0.85 + (dx / dist) * 0.45) * force;
+          }
+
+          // Wrap around viewport edges cleanly
+          const pad = 28;
+          if (dir < 0 && this.y < -pad) {
+            this.y = h + pad;
+            this.x = Math.random() * w;
+          } else if (dir > 0 && this.y > h + pad) {
+            this.y = -pad;
+            this.x = Math.random() * w;
+          }
+          if (this.x < -pad) this.x = w + pad;
+          if (this.x > w + pad) this.x = -pad;
+        }
+
+        draw(ctx, palette) {
+          const color = this.useSecondary ? palette.secondary : palette.primary;
+          const flicker = 0.72 + 0.28 * Math.sin(this.phase * 1.6);
+          const a = this.alpha * flicker;
+
+          ctx.save();
+          ctx.translate(this.x, this.y);
+
+          if (palette.isBokeh && this.glyph === 'ember') {
+            // Shimmering golden bokeh orb
+            const r = this.size * 1.9;
+            const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+            grad.addColorStop(0, rgba(palette.accent, a));
+            grad.addColorStop(0.45, rgba(color, a * 0.55));
+            grad.addColorStop(1, rgba(color, 0));
+            ctx.fillStyle = grad;
+            ctx.beginPath();
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+            ctx.fill();
+          } else if (this.glyph === 'ember') {
+            ctx.fillStyle = rgba(color, a);
+            ctx.beginPath();
+            ctx.arc(0, 0, this.size * 0.45, 0, Math.PI * 2);
+            ctx.fill();
+          } else {
+            ctx.rotate(this.rot);
+            ctx.strokeStyle = rgba(color, a * 0.9);
+            ctx.lineWidth = 1.15;
+            drawGlyphPath(ctx, this.glyph, this.size);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+
+      class Shockwave {
+        constructor(x, y, glyphIndex, palette) {
+          this.x = x;
+          this.y = y;
+          this.glyph = GLYPH_TYPES[glyphIndex % 3];
+          this.radius = 12;
+          this.maxRadius = 290;
+          this.alpha = 0.95;
+          this.rotation = (Math.random() - 0.5) * 0.4;
+          this.color = glyphIndex % 2 === 0 ? palette.primary : palette.secondary;
+        }
+
+        update(dt) {
+          this.radius += (260 + this.radius * 1.45) * dt;
+          this.alpha = Math.max(0, 1 - this.radius / this.maxRadius);
+          this.rotation += dt * 0.35;
+          return this.alpha > 0.01;
+        }
+
+        draw(ctx) {
+          ctx.save();
+          ctx.translate(this.x, this.y);
+          ctx.rotate(this.rotation);
+          ctx.strokeStyle = rgba(this.color, this.alpha);
+          ctx.lineWidth = 2.2 * this.alpha + 0.6;
+          ctx.shadowColor = rgba(this.color, this.alpha * 0.85);
+          ctx.shadowBlur = 16;
+
+          drawGlyphPath(ctx, this.glyph, this.radius);
+          ctx.stroke();
+
+          // Secondary echo ring
+          if (this.radius > 28) {
+            ctx.strokeStyle = rgba(this.color, this.alpha * 0.35);
+            ctx.lineWidth = 1;
+            ctx.shadowBlur = 0;
+            drawGlyphPath(ctx, this.glyph, this.radius * 0.72);
+            ctx.stroke();
+          }
+          ctx.restore();
+        }
+      }
+
+      function drawGlyphPath(ctx, type, size) {
+        ctx.beginPath();
+        if (type === 'circle') {
+          ctx.arc(0, 0, size, 0, Math.PI * 2);
+        } else if (type === 'square') {
+          const s = size * 1.55;
+          ctx.rect(-s / 2, -s / 2, s, s);
+        } else {
+          // Equilateral triangle centered visually
+          const r = size * 1.18;
+          for (let i = 0; i < 3; i++) {
+            const angle = -Math.PI / 2 + (i * Math.PI * 2) / 3;
+            const px = Math.cos(angle) * r;
+            const py = Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(px, py);
+            else ctx.lineTo(px, py);
+          }
+          ctx.closePath();
+        }
+      }
+
+      /* =======================================================================
+         5. BACKGROUND PERSPECTIVE GRID & HIDDEN DALGONA FILIGREE
+         ======================================================================= */
+      function buildDalgonaMotifs(w, h) {
+        const motifs = [];
+        const cols = Math.max(4, Math.floor(w / 240));
+        const rows = Math.max(3, Math.floor(h / 220));
+        const cellW = w / cols;
+        const cellH = h / rows;
+        const shapes = ['circle', 'triangle', 'star', 'umbrella'];
+
+        for (let r = 0; r < rows; r++) {
+          for (let c = 0; c < cols; c++) {
+            const cx = (c + 0.5) * cellW + ((r % 2) * 32 - 16);
+            const cy = (r + 0.5) * cellH;
+            motifs.push({
+              x: cx,
+              y: cy,
+              radius: Math.min(cellW, cellH) * 0.28,
+              shape: shapes[(r * cols + c) % shapes.length],
+              rot: ((r + c) * 0.35) % (Math.PI * 2)
+            });
+          }
+        }
+        return motifs;
+      }
+
+      function drawBackgroundAndFiligree(ctx, w, h, time, mouse, palette, motifs) {
+        // 1. Deep Radial Studio Backdrop
+        const bgGrad = ctx.createRadialGradient(w * 0.5, h * 0.46, 20, w * 0.5, h * 0.5, Math.max(w, h) * 0.78);
+        bgGrad.addColorStop(0, palette.bgCenter);
+        bgGrad.addColorStop(1, palette.bgEdge);
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, w, h);
+
+        // 2. Subtle Glass-Bridge Perspective Floor Grid
+        ctx.save();
+        const horizonY = h * 0.58;
+        const vpX = w * 0.5 + (mouse.normX * 42);
+        const vpY = horizonY + (mouse.normY * 18);
+
+        ctx.strokeStyle = palette.gridColor;
+        ctx.lineWidth = 1;
+
+        // Perspective radiating lines
+        const rayCount = 16;
+        for (let i = -rayCount; i <= rayCount; i++) {
+          const bottomX = w * 0.5 + i * (w / 10);
+          ctx.beginPath();
+          ctx.moveTo(vpX, vpY);
+          ctx.lineTo(bottomX, h + 40);
+          ctx.stroke();
+        }
+
+        // Animated horizontal depth lines
+        const scroll = (time * 0.22) % 1;
+        const rows = 10;
+        for (let i = 0; i < rows; i++) {
+          const t = (i + scroll) / rows;
+          const eased = t * t * t; // Exponential perspective spacing
+          const y = vpY + eased * (h - vpY + 30);
+          ctx.globalAlpha = clamp(eased * 1.4, 0, 0.85);
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(w, y);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // 3. Cursor-Illuminated Hidden Dalgona Filigree
+        const spotRadius = Math.min(w, h) * 0.34;
+        ctx.save();
+        for (let i = 0; i < motifs.length; i++) {
+          const m = motifs[i];
+          const dist = Math.hypot(m.x - mouse.x, m.y - mouse.y);
+          if (dist > spotRadius) continue;
+
+          const reveal = Math.pow(1 - dist / spotRadius, 2.1);
+          const alpha = reveal * 0.34;
+          if (alpha < 0.01) continue;
+
+          ctx.save();
+          ctx.translate(m.x, m.y);
+          ctx.rotate(m.rot + time * 0.06);
+          ctx.strokeStyle = rgba(palette.filigreeColor, alpha);
+          ctx.lineWidth = 1.1;
+
+          // Outer Dalgona tin disc ring
+          ctx.beginPath();
+          ctx.arc(0, 0, m.radius, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.setLineDash([3, 5]);
+          ctx.beginPath();
+          ctx.arc(0, 0, m.radius * 0.84, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          // Inner Dalgona emblem
+          const r = m.radius * 0.48;
+          ctx.beginPath();
+          if (m.shape === 'circle') {
+            ctx.arc(0, 0, r, 0, Math.PI * 2);
+          } else if (m.shape === 'triangle') {
+            for (let k = 0; k < 3; k++) {
+              const a = -Math.PI / 2 + (k * Math.PI * 2) / 3;
+              const px = Math.cos(a) * r;
+              const py = Math.sin(a) * r;
+              if (k === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+          } else if (m.shape === 'star') {
+            for (let k = 0; k < 10; k++) {
+              const a = -Math.PI / 2 + (k * Math.PI) / 5;
+              const rad = k % 2 === 0 ? r : r * 0.44;
+              const px = Math.cos(a) * rad;
+              const py = Math.sin(a) * rad;
+              if (k === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+          } else {
+            // Minimal geometric umbrella motif
+            ctx.arc(0, -r * 0.1, r * 0.78, Math.PI, 0);
+            ctx.moveTo(0, -r * 0.1);
+            ctx.lineTo(0, r * 0.72);
+            ctx.arc(-r * 0.2, r * 0.72, r * 0.2, 0, Math.PI);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.restore();
+
+        // 4. Soft Ambient Cursor Spotlight Bloom
+        const bloom = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, spotRadius * 0.85);
+        bloom.addColorStop(0, rgba(palette.primary, 0.09));
+        bloom.addColorStop(0.5, rgba(palette.secondary, 0.035));
+        bloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = bloom;
+        ctx.fillRect(0, 0, w, h);
+      }
+
+      /* =======================================================================
+         6. ORBITAL SURVEILLANCE GEOMETRY RINGS
+         ======================================================================= */
+      function drawOrbitalGeometry(ctx, cx, cy, baseRadius, time, palette, holdBoost) {
+        const speed = palette.orbitSpeed * (1 + holdBoost * 1.4);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+
+        // Layer A: Outer Measurement Tick Ring
+        const rOuter = baseRadius * 1.56;
+        ctx.save();
+        ctx.rotate(time * speed * 0.35);
+        ctx.strokeStyle = rgba(palette.primary, 0.18);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(0, 0, rOuter, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Architectural degree ticks
+        const tickCount = 72;
+        for (let i = 0; i < tickCount; i++) {
+          const angle = (i / tickCount) * Math.PI * 2;
+          const isMajor = i % 6 === 0;
+          const len = isMajor ? 11 : 4.5;
+          ctx.strokeStyle = isMajor ? rgba(palette.primary, 0.45) : rgba(palette.primary, 0.16);
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(angle) * rOuter, Math.sin(angle) * rOuter);
+          ctx.lineTo(Math.cos(angle) * (rOuter + len), Math.sin(angle) * (rOuter + len));
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        // Layer B: Counter-Rotating Dashed Surveillance Arcs
+        const rMid = baseRadius * 1.34;
+        ctx.save();
+        ctx.rotate(-time * speed * 0.6);
+        ctx.strokeStyle = rgba(palette.secondary, 0.42);
+        ctx.lineWidth = 1.4;
+        ctx.setLineDash([28, 18, 6, 18]);
+        ctx.beginPath();
+        ctx.arc(0, 0, rMid, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Glowing ○ △ □ Glyphs orbiting on Layer B
+        for (let i = 0; i < 6; i++) {
+          const angle = (i * Math.PI) / 3;
+          const gx = Math.cos(angle) * rMid;
+          const gy = Math.sin(angle) * rMid;
+          const glyphType = GLYPH_TYPES[i % 3];
+          const isEven = i % 2 === 0;
+          const glyphColor = isEven ? palette.secondary : palette.primary;
+
+          ctx.save();
+          ctx.translate(gx, gy);
+          ctx.rotate(time * speed * 0.6); // Keep glyphs upright
+          ctx.fillStyle = '#07070b';
+          ctx.beginPath();
+          ctx.arc(0, 0, 15, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = rgba(glyphColor, 0.92);
+          ctx.lineWidth = 1.8;
+          ctx.shadowColor = rgba(glyphColor, 0.85);
+          ctx.shadowBlur = 12;
+          drawGlyphPath(ctx, glyphType, 7.5);
+          ctx.stroke();
+          ctx.restore();
+        }
+        ctx.restore();
+
+        // Layer C: Inner Precision Hairline Ring
+        const rInner = baseRadius * 1.12;
+        ctx.save();
+        ctx.rotate(time * speed * 0.9);
+        ctx.strokeStyle = rgba(palette.primary, 0.24);
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 3; i++) {
+          const start = (i * Math.PI * 2) / 3;
+          ctx.beginPath();
+          ctx.arc(0, 0, rInner, start, start + 1.15);
+          ctx.stroke();
+        }
+        ctx.restore();
+
+        ctx.restore();
+      }
+
+      /* =======================================================================
+         7. 2.5D DYNAMICALLY LIT FRONT MAN MASK RENDERER
+         ======================================================================= */
+      function renderFrontManMask(ctx, mesh, cx, cy, scale, time, mouse, palette, holdBoost) {
+        // Breathing animation + smooth parallax tilt
+        const breatheY = Math.sin(time * 1.55) * 6;
+        const breatheScale = scale * (1 + Math.sin(time * 1.55) * 0.012);
+        const rotY = mouse.smoothNormX * 0.34;
+        const rotX = -mouse.smoothNormY * 0.24;
+
+        // Dynamic light source position in mask-local 3D space
+        const lightPos = [
+          mouse.smoothNormX * 2.4,
+          mouse.smoothNormY * 2.1,
+          1.45 + holdBoost * 0.4
+        ];
+        // Secondary contrasting rim light on the opposite flank
+        const rimLightDir = Vec3.normalize([-mouse.smoothNormX * 1.4 - 0.6, -0.4, 0.45]);
+        const viewDir = [0, 0, 1];
+
+        const projectedFacets = [];
+
+        for (let i = 0; i < mesh.length; i++) {
+          const tri = mesh[i];
+          const tv = tri.verts.map((v) => Vec3.rotateXY(v, rotX, rotY));
+
+          // Compute centroid & surface normal
+          const centroid = [
+            (tv[0][0] + tv[1][0] + tv[2][0]) / 3,
+            (tv[0][1] + tv[1][1] + tv[2][1]) / 3,
+            (tv[0][2] + tv[1][2] + tv[2][2]) / 3
+          ];
+
+          const e1 = Vec3.sub(tv[1], tv[0]);
+          const e2 = Vec3.sub(tv[2], tv[0]);
+          const normal = Vec3.normalize(Vec3.cross(e1, e2));
+
+          // Backface culling (skip facets facing completely away)
+          if (normal[2] < -0.1) continue;
+
+          // Perspective projection to 2D canvas
+          const fov = 4.2;
+          const pts2D = tv.map((v) => {
+            const p = fov / (fov - v[2]);
+            return [
+              cx + v[0] * breatheScale * p,
+              cy + breatheY + v[1] * breatheScale * p
+            ];
+          });
+
+          projectedFacets.push({
+            pts2D,
+            normal,
+            centroid,
+            depth: centroid[2],
+            type: tri.type
+          });
+        }
+
+        // Painter's algorithm: draw farthest facets first
+        projectedFacets.sort((a, b) => a.depth - b.depth);
+
+        // Subtle atmospheric halo directly behind the mask
+        ctx.save();
+        const halo = ctx.createRadialGradient(cx, cy + breatheY, breatheScale * 0.2, cx, cy + breatheY, breatheScale * 1.45);
+        halo.addColorStop(0, rgba(palette.secondary, 0.16 + holdBoost * 0.1));
+        halo.addColorStop(0.55, rgba(palette.primary, 0.08));
+        halo.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(cx, cy + breatheY, breatheScale * 1.45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // Shade and draw each facet
+        for (let i = 0; i < projectedFacets.length; i++) {
+          const f = projectedFacets[i];
+          const [p0, p1, p2] = f.pts2D;
+
+          ctx.beginPath();
+          ctx.moveTo(p0[0], p0[1]);
+          ctx.lineTo(p1[0], p1[1]);
+          ctx.lineTo(p2[0], p2[1]);
+          ctx.closePath();
+
+          if (f.type === 'eye') {
+            // Deep obsidian eye recess with eerie inner glow
+            const eyePulse = 0.08 + 0.06 * Math.sin(time * 2.8);
+            ctx.fillStyle = `rgb(${(4 + palette.secondary[0] * eyePulse) | 0}, ${(4 + palette.secondary[1] * eyePulse) | 0}, ${(7 + palette.secondary[2] * eyePulse) | 0})`;
+            ctx.fill();
+            ctx.strokeStyle = rgba(palette.secondary, 0.35);
+            ctx.lineWidth = 0.9;
+            ctx.stroke();
+            continue;
+          }
+
+          // Directional vector from facet to cursor light
+          const lightDir = Vec3.normalize(Vec3.sub(lightPos, f.centroid));
+          const diff = clamp(Vec3.dot(f.normal, lightDir), 0, 1);
+
+          // Blinn-Phong metallic obsidian specular highlight
+          const halfVec = Vec3.normalize([
+            lightDir[0] + viewDir[0],
+            lightDir[1] + viewDir[1],
+            lightDir[2] + viewDir[2]
+          ]);
+          const spec = Math.pow(clamp(Vec3.dot(f.normal, halfVec), 0, 1), 18);
+
+          // Fresnel-like rim lighting for dramatic neon edge sheen
+          const ndotv = clamp(Vec3.dot(f.normal, viewDir), 0, 1);
+          const fresnel = Math.pow(1 - ndotv, 2.2);
+          const rimFactor = clamp(Vec3.dot(f.normal, rimLightDir), 0, 1);
+
+          const intensity = 0.16 + diff * (0.62 + holdBoost * 0.2);
+          const r = clamp(
+            palette.maskBase[0] * (0.65 + intensity * 1.6) +
+            palette.primary[0] * (diff * 0.28 + fresnel * 0.42) +
+            palette.secondary[0] * (rimFactor * 0.48 + fresnel * 0.25) +
+            palette.maskSpec[0] * spec * 0.55,
+            0, 255
+          );
+          const g = clamp(
+            palette.maskBase[1] * (0.65 + intensity * 1.6) +
+            palette.primary[1] * (diff * 0.28 + fresnel * 0.42) +
+            palette.secondary[1] * (rimFactor * 0.48 + fresnel * 0.25) +
+            palette.maskSpec[1] * spec * 0.55,
+            0, 255
+          );
+          const b = clamp(
+            palette.maskBase[2] * (0.65 + intensity * 1.6) +
+            palette.primary[2] * (diff * 0.28 + fresnel * 0.42) +
+            palette.secondary[2] * (rimFactor * 0.48 + fresnel * 0.25) +
+            palette.maskSpec[2] * spec * 0.55,
+            0, 255
+          );
+
+          ctx.fillStyle = `rgb(${r | 0}, ${g | 0}, ${b | 0})`;
+          ctx.fill();
+
+          // Architectural facet bevel wireframe
+          ctx.strokeStyle = spec > 0.22
+            ? rgba(palette.primary, 0.55)
+            : (rimFactor > 0.4 ? rgba(palette.secondary, 0.42) : palette.wireframe);
+          ctx.lineWidth = 0.85;
+          ctx.stroke();
+        }
+      }
+
+      /* =======================================================================
+         8. RED LIGHT SURVEILLANCE OVERLAY & CHROMATIC GLITCH EFFECT
+         ======================================================================= */
+      function drawRedLightOverlay(ctx, w, h, time, mouse) {
+        ctx.save();
+
+        // Sweeping horizontal laser scanline
+        const scanY = ((time * 165) % (h + 160)) - 80;
+        const scanGrad = ctx.createLinearGradient(0, scanY - 45, 0, scanY + 45);
+        scanGrad.addColorStop(0, 'rgba(255, 0, 60, 0)');
+        scanGrad.addColorStop(0.5, 'rgba(255, 0, 60, 0.26)');
+        scanGrad.addColorStop(1, 'rgba(255, 0, 60, 0)');
+        ctx.fillStyle = scanGrad;
+        ctx.fillRect(0, scanY - 45, w, 90);
+
+        // Crisp laser core line
+        ctx.strokeStyle = 'rgba(255, 190, 205, 0.72)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(0, scanY);
+        ctx.lineTo(w, scanY);
+        ctx.stroke();
+
+        // Subtle CRT scanlines
+        ctx.fillStyle = 'rgba(255, 0, 60, 0.028)';
+        for (let y = 0; y < h; y += 4) {
+          ctx.fillRect(0, y, w, 1);
+        }
+
+        // Tactical Motion-Detection Crosshair tracking the cursor
+        const mx = mouse.x;
+        const my = mouse.y;
+        const r = 24;
+
+        ctx.strokeStyle = 'rgba(255, 0, 60, 0.82)';
+        ctx.lineWidth = 1.25;
+
+        // Corner brackets
+        const b = 10;
+        ctx.beginPath();
+        ctx.moveTo(mx - r, my - r + b); ctx.lineTo(mx - r, my - r); ctx.lineTo(mx - r + b, my - r);
+        ctx.moveTo(mx + r - b, my - r); ctx.lineTo(mx + r, my - r); ctx.lineTo(mx + r, my - r + b);
+        ctx.moveTo(mx + r, my + r - b); ctx.lineTo(mx + r, my + r); ctx.lineTo(mx + r - b, my + r);
+        ctx.moveTo(mx - r + b, my + r); ctx.lineTo(mx - r, my + r); ctx.lineTo(mx - r, my + r - b);
+        ctx.stroke();
+
+        // Hairline crosshairs extending subtly
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.moveTo(mx - 44, my); ctx.lineTo(mx - 8, my);
+        ctx.moveTo(mx + 8, my); ctx.lineTo(mx + 44, my);
+        ctx.moveTo(mx, my - 44); ctx.lineTo(mx, my - 8);
+        ctx.moveTo(mx, my + 8); ctx.lineTo(mx, my + 44);
+        ctx.stroke();
+
+        // Center target dot
+        ctx.fillStyle = '#ff003c';
+        ctx.beginPath();
+        ctx.arc(mx, my, 2.2, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Telemetry Label
+        const labelX = mx + 32 > w - 180 ? mx - 178 : mx + 32;
+        const labelY = my - 10 < 28 ? my + 24 : my - 10;
+        ctx.font = '600 10px SFMono-Regular, Consolas, monospace';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.88)';
+        ctx.fillText('PLAYER 456 // TRACKING', labelX, labelY);
+        ctx.font = '400 9px SFMono-Regular, Consolas, monospace';
+        ctx.fillStyle = 'rgba(255, 0, 60, 0.85)';
+        ctx.fillText(`X:${(mx | 0).toString().padStart(4, '0')}  Y:${(my | 0).toString().padStart(4, '0')}`, labelX, labelY + 13);
+
+        ctx.restore();
+      }
+
+      function applyGlitchSlices(ctx, canvas, dpr, w, h, intensity) {
+        if (intensity <= 0.01) return;
+        const sliceCount = 4 + ((intensity * 10) | 0);
+        const maskBandW = Math.min(w, h) * 0.62;
+        const bandX = (w - maskBandW) * 0.5;
+
+        ctx.save();
+        for (let i = 0; i < sliceCount; i++) {
+          const sy = h * (0.16 + Math.random() * 0.68);
+          const sh = 4 + Math.random() * 22;
+          const offset = (Math.random() - 0.5) * 44 * intensity;
+
+          // Displace horizontal slice
+          ctx.drawImage(
+            canvas,
+            bandX * dpr, sy * dpr, maskBandW * dpr, sh * dpr,
+            bandX + offset, sy, maskBandW, sh
+          );
+
+          // Chromatic RGB tear accent bar
+          ctx.globalCompositeOperation = 'screen';
+          ctx.fillStyle = i % 2 === 0
+            ? `rgba(255, 0, 60, ${0.22 * intensity})`
+            : `rgba(0, 240, 200, ${0.22 * intensity})`;
+          ctx.fillRect(bandX + offset * 1.4, sy, maskBandW, Math.max(2, sh * 0.35));
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        ctx.restore();
+      }
+
+      /* =======================================================================
+         9. MAIN ARTWORK ENGINE & INTERACTION CONTROLLER
+         ======================================================================= */
+      class SquidProtocolApp {
+        constructor() {
+          this.canvas = document.getElementById('artCanvas');
+          this.ctx = this.canvas.getContext('2d', { alpha: false });
+
+          // HUD references
+          this.hudLayer = document.getElementById('hudLayer');
+          this.btnRestoreHud = document.getElementById('btnRestoreHud');
+          this.modeReadout = document.getElementById('modeReadout');
+          this.statusDot = document.getElementById('statusDot');
+          this.toast = document.getElementById('toast');
+          this.modeButtons = Array.from(document.querySelectorAll('[data-mode]'));
+
+          // State
+          this.width = window.innerWidth;
+          this.height = window.innerHeight;
+          this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+          this.modeKey = 'green';
+          this.palette = PALETTES.green;
+          this.mesh = buildFrontManMaskMesh();
+          this.particles = [];
+          this.shockwaves = [];
+          this.motifs = [];
+          this.glyphClickCounter = 0;
+
+          // Pointer & Lighting State
+          this.mouse = {
+            x: this.width * 0.5,
+            y: this.height * 0.45,
+            normX: 0,
+            normY: 0,
+            smoothNormX: 0,
+            smoothNormY: 0,
+            isDown: false
+          };
+
+          this.holdBoost = 0;
+          this.glitchIntensity = 0;
+          this.redAutoGlitchTimer = 2.2;
+          this.lastTime = performance.now();
+          this.elapsed = 0;
+
+          this.init();
+        }
+
+        init() {
+          this.handleResize();
+          this.spawnParticles();
+          this.bindEvents();
+          this.setMode('green');
+          requestAnimationFrame((t) => this.loop(t));
+        }
+
+        handleResize() {
+          this.width = window.innerWidth;
+          this.height = window.innerHeight;
+          this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+          this.canvas.width = Math.floor(this.width * this.dpr);
+          this.canvas.height = Math.floor(this.height * this.dpr);
+          this.canvas.style.width = `${this.width}px`;
+          this.canvas.style.height = `${this.height}px`;
+
+          this.motifs = buildDalgonaMotifs(this.width, this.height);
+        }
+
+        spawnParticles() {
+          const count = clamp(Math.floor((this.width * this.height) / 14500), 48, 120);
+          this.particles = [];
+          for (let i = 0; i < count; i++) {
+            this.particles.push(new AmbientParticle(this.width, this.height, true));
+          }
+        }
+
+        setMode(modeKey) {
+          if (!PALETTES[modeKey]) return;
+          this.modeKey = modeKey;
+          this.palette = PALETTES[modeKey];
+
+          // Update HUD styling & active states
+          this.modeReadout.textContent = this.palette.label;
+          document.documentElement.style.setProperty('--accent-primary', this.palette.cssPrimary);
+          document.documentElement.style.setProperty('--accent-secondary', this.palette.cssSecondary);
+
+          this.modeButtons.forEach((btn) => {
+            btn.classList.toggle('is-active', btn.dataset.mode === modeKey);
+          });
+
+          // Trigger a crisp mode-switch glitch pulse
+          this.triggerGlitch(0.65);
+        }
+
+        triggerGlitch(amount = 0.95) {
+          this.glitchIntensity = Math.max(this.glitchIntensity, amount);
+        }
+
+        triggerShockwave(x, y) {
+          this.shockwaves.push(new Shockwave(x, y, this.glyphClickCounter++, this.palette));
+          this.triggerGlitch(0.55);
+        }
+
+        toggleHud(forceHidden) {
+          const hide = typeof forceHidden === 'boolean'
+            ? forceHidden
+            : !this.hudLayer.classList.contains('is-hidden');
+          this.hudLayer.classList.toggle('is-hidden', hide);
+          this.btnRestoreHud.classList.toggle('is-visible', hide);
+        }
+
+        exportPNG() {
+          try {
+            const link = document.createElement('a');
+            link.download = 'squid-protocol-456.png';
+            link.href = this.canvas.toDataURL('image/png', 1.0);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+
+            this.toast.classList.add('is-shown');
+            clearTimeout(this.toastTimer);
+            this.toastTimer = setTimeout(() => {
+              this.toast.classList.remove('is-shown');
+            }, 2400);
+          } catch (err) {
+            console.error('Export failed:', err);
+          }
+        }
+
+        updatePointer(clientX, clientY) {
+          this.mouse.x = clientX;
+          this.mouse.y = clientY;
+          this.mouse.normX = clamp((clientX / this.width) * 2 - 1, -1, 1);
+          this.mouse.normY = clamp((clientY / this.height) * 2 - 1, -1, 1);
+        }
+
+        bindEvents() {
+          window.addEventListener('resize', () => {
+            this.handleResize();
+            this.spawnParticles();
+          });
+
+          // Mouse Interaction
+          this.canvas.addEventListener('pointerdown', (e) => {
+            this.mouse.isDown = true;
+            this.updatePointer(e.clientX, e.clientY);
+            this.triggerShockwave(e.clientX, e.clientY);
+          });
+
+          window.addEventListener('pointermove', (e) => {
+            this.updatePointer(e.clientX, e.clientY);
+          });
+
+          window.addEventListener('pointerup', () => {
+            this.mouse.isDown = false;
+          });
+
+          // HUD Buttons
+          this.modeButtons.forEach((btn) => {
+            btn.addEventListener('click', () => this.setMode(btn.dataset.mode));
+          });
+
+          document.getElementById('btnGlitch').addEventListener('click', () => {
+            this.triggerGlitch(1.0);
+            this.triggerShockwave(this.width * 0.5, this.height * 0.5);
+          });
+
+          document.getElementById('btnSave').addEventListener('click', () => this.exportPNG());
+          document.getElementById('btnHideHud').addEventListener('click', () => this.toggleHud(true));
+          this.btnRestoreHud.addEventListener('click', () => this.toggleHud(false));
+
+          // Keyboard Shortcuts (1, 2, 3, H, Space)
+          window.addEventListener('keydown', (e) => {
+            if (e.key === '1') this.setMode('green');
+            else if (e.key === '2') this.setMode('red');
+            else if (e.key === '3') this.setMode('gold');
+            else if (e.key.toLowerCase() === 'h') this.toggleHud();
+            else if (e.code === 'Space') {
+              e.preventDefault();
+              this.triggerGlitch(1.0);
+              this.triggerShockwave(this.width * 0.5, this.height * 0.5);
+            }
+          });
+        }
+
+        loop(now) {
+          const dt = Math.min((now - this.lastTime) / 1000, 0.05);
+          this.lastTime = now;
+          this.elapsed += dt;
+
+          // Smooth pointer interpolation for liquid 3D parallax
+          this.mouse.smoothNormX = lerp(this.mouse.smoothNormX, this.mouse.normX, dt * 6.5);
+          this.mouse.smoothNormY = lerp(this.mouse.smoothNormY, this.mouse.normY, dt * 6.5);
+          this.holdBoost = lerp(this.holdBoost, this.mouse.isDown ? 1 : 0, dt * 5);
+
+          // Decay glitch intensity; trigger periodic tension bursts in Red Light mode
+          this.glitchIntensity = Math.max(0, this.glitchIntensity - dt * 2.4);
+          if (this.modeKey === 'red') {
+            this.redAutoGlitchTimer -= dt;
+            if (this.redAutoGlitchTimer <= 0) {
+              this.triggerGlitch(0.65 + Math.random() * 0.35);
+              this.redAutoGlitchTimer = 1.6 + Math.random() * 2.4;
+            }
+          }
+
+          this.render(dt);
+          requestAnimationFrame((t) => this.loop(t));
+        }
+
+        render(dt) {
+          const ctx = this.ctx;
+          const w = this.width;
+          const h = this.height;
+          const cx = w * 0.5;
+          const cy = h * 0.49;
+          const maskScale = Math.min(w, h) * 0.22;
+
+          ctx.save();
+          ctx.scale(this.dpr, this.dpr);
+
+          // 1. Background, Glass Bridge Grid & Hidden Dalgona Filigree
+          drawBackgroundAndFiligree(ctx, w, h, this.elapsed, this.mouse, this.palette, this.motifs);
+
+          // 2. Ambient Particles & Golden Bokeh
+          for (let i = 0; i < this.particles.length; i++) {
+            const p = this.particles[i];
+            p.update(w, h, dt, this.mouse, this.palette);
+            p.draw(ctx, this.palette);
+          }
+
+          // 3. Rotating Multi-Layered Orbital Geometry & Glyphs
+          drawOrbitalGeometry(ctx, cx, cy, maskScale, this.elapsed, this.palette, this.holdBoost);
+
+          // 4. Centerpiece: Faceted 2.5D Dynamically Lit Front Man Mask
+          renderFrontManMask(ctx, this.mesh, cx, cy, maskScale, this.elapsed, this.mouse, this.palette, this.holdBoost);
+
+          // 5. Click Shockwaves (○, △, □)
+          for (let i = 0; i < this.shockwaves.length - 1; i--) {
+            const sw = this.shockwaves[i];
+            if (!sw.update(dt)) {
+              this.shockwaves.splice(i, 1);
+            } else {
+              sw.draw(ctx);
+            }
+          }
+
+          // 6. Red Light Surveillance Laser & Crosshair
+          if (this.modeKey === 'red') {
+            drawRedLightOverlay(ctx, w, h, this.elapsed, this.mouse);
+          }
+
+          // 7. Chromatic Slice Glitch Post-Process
+          if (this.glitchIntensity > 0.01) {
+            applyGlitchSlices(ctx, this.canvas, this.dpr, w, h, this.glitchIntensity);
+          }
+
+          // 8. Subtle Gallery Vignette
+          const vig = ctx.createRadialGradient(cx, cy, Math.min(w, h) * 0.35, cx, cy, Math.max(w, h) * 0.75);
+          vig.addColorStop(0, 'rgba(0,0,0,0)');
+          vig.addColorStop(1, 'rgba(0,0,0,0.52)');
+          ctx.fillStyle = vig;
+          ctx.fillRect(0, 0, w, h);
+
+          ctx.restore();
+        }
+      }
+
+      // Launch once DOM is ready
+      window.addEventListener('DOMContentLoaded', () => {
+        new SquidProtocolApp();
+      });
+    })();
+  </script>
+</body>
+</html>
