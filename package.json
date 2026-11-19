@@ -1,26 +1,24 @@
 {
   "name": "squid-protocol-456",
   "version": "1.0.0",
-  "description": "SQUID PROTOCOL // 456 — Interactive generative digital canvas artwork inspired by Squid Game",
+  "description": "SQUID PROTOCOL // 456 — Interactive generative digital canvas artwork",
   "main": "index.html",
   "scripts": {
-    "start": "npx --yes serve ."
+    "start": "node server.js"
   },
   "keywords": [
-    "squid-game",
     "generative-art",
     "canvas",
     "html5-canvas",
     "creative-coding",
     "interactive-art",
     "3d",
-    "front-man",
     "web-art"
   ],
   "author": "dhruvsharda12",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dhruvsharda12/squid-protocol-456.git"
+    "url": "https://github.com/dhruvsharda12/SQUID-PROTOCAL-456.git"
   }
 }
